@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  # Base de données PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    container_name: tamis-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tamis
+      POSTGRES_PASSWORD: tamis_dev_password
+      POSTGRES_DB: tamis_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./server/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - tamis-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tamis"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis pour le cache et les sessions
+  redis:
+    image: redis:7-alpine
+    container_name: tamis-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - tamis-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend Go
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+      target: development
+    container_name: tamis-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgres://tamis:tamis_dev_password@postgres:5432/tamis_db?sslmode=disable
+      - REDIS_URL=redis:6379
+      - GO_ENV=development
+      - PORT=8080
+    volumes:
+      - ./server:/app
+      - /app/tmp
+    networks:
+      - tamis-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: air -c .air.toml
+
+  # Frontend Next.js
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      target: development
+    container_name: tamis-client
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8080
+      - NODE_ENV=development
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - tamis-network
+    depends_on:
+      - server
+    command: npm run dev
+
+  # Adminer - Interface web pour PostgreSQL (optionnel)
+  adminer:
+    image: adminer:latest
+    container_name: tamis-adminer
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    networks:
+      - tamis-network
+    depends_on:
+      - postgres
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  tamis-network:
+    driver: bridge
