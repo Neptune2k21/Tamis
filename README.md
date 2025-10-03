@@ -1,15 +1,3 @@
-Parfait 💡 tu veux un **README “dev-friendly” moderne**, avec :
-
-* Table des matières cliquable
-* Badges et tags
-* Sections bien structurées
-* Code snippets stylés
-* Mise en page type projet pro GitHub
-
-Voici une version **réécrite et moderne pour Tamis** :
-
----
-
 ```markdown
 # Tamis 🧹
 
