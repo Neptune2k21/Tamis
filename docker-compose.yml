@@ -11,14 +11,13 @@ services:
       POSTGRES_PASSWORD: tamis_dev_password
       POSTGRES_DB: tamis_db
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./server/migrations:/docker-entrypoint-initdb.d
     networks:
       - tamis-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tamis"]
+      test: ["CMD-SHELL", "pg_isready -U tamis -d tamis_db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -51,10 +50,17 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - DATABASE_URL=postgres://tamis:tamis_dev_password@postgres:5432/tamis_db?sslmode=disable
-      - REDIS_URL=redis:6379
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=tamis
+      - DB_PASSWORD=tamis_dev_password
+      - DB_NAME=tamis_db
+      - DB_SSL_MODE=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
       - GO_ENV=development
       - PORT=8080
+      - JWT_SECRET=Tamis-Mamadou-super-secret-key
     volumes:
       - ./server:/app
       - /app/tmp
@@ -76,7 +82,7 @@ services:
     container_name: tamis-client
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8080
       - NODE_ENV=development
@@ -88,9 +94,8 @@ services:
       - tamis-network
     depends_on:
       - server
-    command: npm run dev
 
-  # Adminer - Interface web pour PostgreSQL (optionnel)
+  # Adminer - Interface web pour PostgreSQL
   adminer:
     image: adminer:latest
     container_name: tamis-adminer

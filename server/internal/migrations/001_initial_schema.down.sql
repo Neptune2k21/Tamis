@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS emails;
+DROP TABLE IF EXISTS email_accounts;
+DROP TABLE IF EXISTS users;
