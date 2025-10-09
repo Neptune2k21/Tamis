@@ -35,5 +35,5 @@ type EmailFilter struct {
 
 type DeleteEmailsRequest struct {
 	EmailIDs []string `json:"email_ids" validate:"required,min=1"`
-	Force    bool     `json:"force,omitempty"` // Suppression définitive ou corbeille
+	Force    bool     `json:"force,omitempty"`
 }

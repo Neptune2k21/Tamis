@@ -33,9 +33,8 @@ func NewAuthService(userRepo *repository.UserRepository, logger *utils.Logger, j
 	}
 }
 
-// Register - Inscription avec le VRAI mot de passe
+// Register - Inscription
 func (s *AuthService) Register(req *models.CreateUserRequest) (*models.User, error) {
-	// Validation basique
 	if req.Email == "" || req.Username == "" || req.Password == "" {
 		return nil, fmt.Errorf("email, username and password are required")
 	}

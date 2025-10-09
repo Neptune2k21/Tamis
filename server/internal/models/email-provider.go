@@ -19,9 +19,9 @@ type EmailAccount struct {
 	Provider       EmailProvider `json:"provider" db:"provider"`
 	Email          string        `json:"email" db:"email"`
 	DisplayName    string        `json:"display_name" db:"display_name"`
-	AccessToken    string        `json:"-" db:"access_token"`     // Ne pas exposer en JSON
-	RefreshToken   string        `json:"-" db:"refresh_token"`    // Ne pas exposer en JSON
-	TokenExpiresAt *time.Time    `json:"-" db:"token_expires_at"` // Ne pas exposer en JSON
+	AccessToken    string        `json:"-" db:"access_token"`
+	RefreshToken   string        `json:"-" db:"refresh_token"`
+	TokenExpiresAt *time.Time    `json:"-" db:"token_expires_at"`
 	IsActive       bool          `json:"is_active" db:"is_active"`
 	CreatedAt      time.Time     `json:"created_at" db:"created_at"`
 	UpdatedAt      time.Time     `json:"updated_at" db:"updated_at"`
