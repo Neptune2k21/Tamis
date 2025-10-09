@@ -94,6 +94,7 @@ services:
       - tamis-network
     depends_on:
       - server
+    command: "npm run dev"
 
   # Adminer - Interface web pour PostgreSQL
   adminer:

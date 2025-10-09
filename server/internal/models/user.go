@@ -11,7 +11,7 @@ type User struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// CreateUserRequest - Requête d'inscription (AVEC password maintenant!)
+// CreateUserRequest - Requête d'inscription
 type CreateUserRequest struct {
 	Email    string `json:"email" validate:"required,email"`
 	Username string `json:"username" validate:"required,min=3,max=50"`

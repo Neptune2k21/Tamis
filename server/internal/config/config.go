@@ -6,10 +6,12 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
-	Redis    RedisConfig
-	JWT      JWTConfig
+	Server     ServerConfig
+	Database   DatabaseConfig
+	Redis      RedisConfig
+	JWT        JWTConfig
+	Encryption EncryptionConfig
+	OAuth2     OAuth2Config
 }
 
 type ServerConfig struct {
@@ -35,6 +37,28 @@ type JWTConfig struct {
 	Secret string
 }
 
+type EncryptionConfig struct {
+	Key string // Clé AES-256 pour chiffrer les tokens OAuth2
+}
+
+type OAuth2Config struct {
+	Gmail struct {
+		ClientID     string
+		ClientSecret string
+		RedirectURL  string
+	}
+	Outlook struct {
+		ClientID     string
+		ClientSecret string
+		RedirectURL  string
+	}
+	Yahoo struct {
+		ClientID     string
+		ClientSecret string
+		RedirectURL  string
+	}
+}
+
 func Load() *Config {
 	return &Config{
 		Server: ServerConfig{
@@ -54,9 +78,39 @@ func Load() *Config {
 			Port: getEnv("REDIS_PORT", "6379"),
 		},
 		JWT: JWTConfig{
-			// ⚠️ EN PRODUCTION: Utilise une clé secrète forte et unique !
-			// Génère avec: openssl rand -base64 32
 			Secret: getEnv("JWT_SECRET", "your-super-secret-jwt-key-change-this-in-production"),
+		},
+		Encryption: EncryptionConfig{
+			Key: getEnv("ENCRYPTION_KEY", "tamis-super-secret-encryption-key-32-bytes"),
+		},
+		OAuth2: OAuth2Config{
+			Gmail: struct {
+				ClientID     string
+				ClientSecret string
+				RedirectURL  string
+			}{
+				ClientID:     getEnv("GMAIL_CLIENT_ID", ""),
+				ClientSecret: getEnv("GMAIL_CLIENT_SECRET", ""),
+				RedirectURL:  getEnv("GMAIL_REDIRECT_URL", "http://localhost:8080/auth/gmail/callback"),
+			},
+			Outlook: struct {
+				ClientID     string
+				ClientSecret string
+				RedirectURL  string
+			}{
+				ClientID:     getEnv("OUTLOOK_CLIENT_ID", ""),
+				ClientSecret: getEnv("OUTLOOK_CLIENT_SECRET", ""),
+				RedirectURL:  getEnv("OUTLOOK_REDIRECT_URL", "http://localhost:8080/auth/outlook/callback"),
+			},
+			Yahoo: struct {
+				ClientID     string
+				ClientSecret string
+				RedirectURL  string
+			}{
+				ClientID:     getEnv("YAHOO_CLIENT_ID", ""),
+				ClientSecret: getEnv("YAHOO_CLIENT_SECRET", ""),
+				RedirectURL:  getEnv("YAHOO_REDIRECT_URL", "http://localhost:8080/auth/yahoo/callback"),
+			},
 		},
 	}
 }

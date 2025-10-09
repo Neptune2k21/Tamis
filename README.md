@@ -79,7 +79,7 @@ Tamis/
 1. **Cloner le projet**  
 
 ```bash
-git clone https://github.com/<votre-utilisateur>/Tamis.git
+git clone https://github.com/Neptune2k21/Tamis.git
 cd Tamis
 ````
 
@@ -96,8 +96,8 @@ cp .env.example .env
 docker-compose up --build
 ```
 
-* Backend : `http://localhost:5000`
-* Frontend : `http://localhost:3000`
+* Backend : `http://localhost:8080`
+* Frontend : `http://localhost:3001`
 
 ---
 

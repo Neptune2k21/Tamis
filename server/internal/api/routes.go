@@ -1,44 +1,119 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"tamis-server/internal/config"
+	"tamis-server/internal/handlers"
 	"tamis-server/internal/middleware"
 	"tamis-server/internal/models"
 	"tamis-server/internal/services"
 	"tamis-server/internal/utils"
 )
 
+// RegisterRoutes - Point d'entrée principal pour l'enregistrement des routes
 func RegisterRoutes(
 	mux *http.ServeMux,
 	cfg *config.Config,
 	logger *utils.Logger,
 	authService *services.AuthService,
 	authMiddleware *middleware.AuthMiddleware,
+	accountService *services.AccountService,
+	mailService *services.MailService,
+	oauth2Service *utils.OAuth2Service,
 ) {
-	// Routes publiques (pas de JWT requis)
+	// Routes d'authentification (publiques)
+	registerAuthRoutes(mux, authService, logger)
+
+	// Routes d'API générales
+	registerAPIRoutes(mux, cfg, logger, authMiddleware)
+
+	// Routes de gestion des comptes email (protégées)
+	registerAccountRoutes(mux, authMiddleware, accountService, logger)
+
+	// Routes OAuth2 (protégées)
+	registerOAuthRoutes(mux, authMiddleware, oauth2Service, accountService, logger)
+
+	// Routes de gestion des emails (protégées)
+	registerMailRoutes(mux, authMiddleware, mailService, logger)
+}
+
+// registerAuthRoutes - Routes d'authentification
+func registerAuthRoutes(mux *http.ServeMux, authService *services.AuthService, logger *utils.Logger) {
 	mux.HandleFunc("/api/auth/register", corsMiddleware(registerHandler(authService, logger)))
 	mux.HandleFunc("/api/auth/login", corsMiddleware(loginHandler(authService, logger)))
 	mux.HandleFunc("/api/auth/refresh", corsMiddleware(refreshTokenHandler(authService, logger)))
+}
+
+// registerAPIRoutes - Routes de l'API (protégées et publiques)
+func registerAPIRoutes(mux *http.ServeMux, cfg *config.Config, logger *utils.Logger, authMiddleware *middleware.AuthMiddleware) {
+	// Route de santé (publique)
 	mux.HandleFunc("/api/health", corsMiddleware(healthHandler(cfg, logger)))
 
-	// Routes protégées (JWT requis via Authorization: Bearer <token>)
+	// Routes protégées
 	mux.Handle("/api/user/me",
 		authMiddleware.CORS(
 			authMiddleware.RequireAuth(http.HandlerFunc(meHandler(logger))),
 		))
+}
 
-	mux.Handle("/api/emails",
+// registerAccountRoutes - Routes de gestion des comptes email
+func registerAccountRoutes(mux *http.ServeMux, authMiddleware *middleware.AuthMiddleware, accountService *services.AccountService, logger *utils.Logger) {
+	// Ajouter un compte email
+	mux.Handle("/api/accounts/add",
 		authMiddleware.CORS(
-			authMiddleware.RequireAuth(http.HandlerFunc(emailsHandler(cfg, logger))),
+			authMiddleware.RequireAuth(http.HandlerFunc(AddAccountHandler(accountService, logger))),
 		))
 
-	mux.Handle("/api/emails/delete",
+	// Lister les comptes email
+	mux.Handle("/api/accounts",
 		authMiddleware.CORS(
-			authMiddleware.RequireAuth(http.HandlerFunc(deleteHandler(cfg, logger))),
+			authMiddleware.RequireAuth(http.HandlerFunc(ListAccountsHandler(accountService, logger))),
 		))
 
+	// Supprimer un compte email
+	mux.Handle("/api/accounts/remove",
+		authMiddleware.CORS(
+			authMiddleware.RequireAuth(http.HandlerFunc(DeleteAccountHandler(accountService, logger))),
+		))
+}
+
+// registerOAuthRoutes - Routes OAuth2
+func registerOAuthRoutes(mux *http.ServeMux, authMiddleware *middleware.AuthMiddleware, oauth2Service *utils.OAuth2Service, accountService *services.AccountService, logger *utils.Logger) {
+	// Initier OAuth Google
+	mux.Handle("/api/oauth/google/initiate",
+		authMiddleware.CORS(
+			authMiddleware.RequireAuth(http.HandlerFunc(handlers.InitiateGoogleOAuthHandler(oauth2Service, logger))),
+		))
+
+	// Callback OAuth Google (public)
+	mux.HandleFunc("/api/oauth/google/callback", corsMiddleware(handlers.GoogleOAuthCallbackHandler(oauth2Service, accountService, logger)))
+
+	// Finaliser l'ajout du compte
+	mux.Handle("/api/oauth/complete",
+		authMiddleware.CORS(
+			authMiddleware.RequireAuth(http.HandlerFunc(handlers.CompleteAccountSetupHandler(oauth2Service, accountService, logger))),
+		))
+}
+
+// registerMailRoutes - Routes de gestion des emails
+func registerMailRoutes(mux *http.ServeMux, authMiddleware *middleware.AuthMiddleware, mailService *services.MailService, logger *utils.Logger) {
+	// Lister tous les emails consolidés
+	mux.Handle("/api/mails",
+		authMiddleware.CORS(
+			authMiddleware.RequireAuth(http.HandlerFunc(ListMailsHandler(mailService, logger))),
+		))
+
+	// Actions sur les emails (supprimer, archiver, marquer lu)
+	mux.Handle("/api/mails/action",
+		authMiddleware.CORS(
+			authMiddleware.RequireAuth(http.HandlerFunc(MailActionHandler(mailService, logger))),
+		))
+
+	// Synchroniser les emails
+	mux.Handle("/api/mails/sync",
+		authMiddleware.CORS(
+			authMiddleware.RequireAuth(http.HandlerFunc(SyncMailsHandler(mailService, logger))),
+		))
 }
 
 // corsMiddleware - CORS pour les routes publiques
@@ -54,109 +129,6 @@ func corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		next(w, r)
-	}
-}
-
-// registerHandler - Inscription d'un nouvel utilisateur
-func registerHandler(authService *services.AuthService, logger *utils.Logger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			utils.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
-			return
-		}
-
-		var req models.CreateUserRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			utils.WriteError(w, http.StatusBadRequest, "Invalid JSON")
-			return
-		}
-
-		// Validation des champs
-		if req.Email == "" || req.Username == "" || req.Password == "" {
-			utils.WriteError(w, http.StatusBadRequest, "Email, username and password are required")
-			return
-		}
-
-		if len(req.Password) < 8 {
-			utils.WriteError(w, http.StatusBadRequest, "Password must be at least 8 characters")
-			return
-		}
-
-		user, err := authService.Register(&req)
-		if err != nil {
-			logger.Error("Registration failed: " + err.Error())
-			utils.WriteError(w, http.StatusBadRequest, err.Error())
-			return
-		}
-
-		// Ne pas retourner le mot de passe dans la réponse
-		utils.WriteSuccess(w, map[string]interface{}{
-			"user": user,
-		}, "User registered successfully. Please login to get your token.")
-	}
-}
-
-// loginHandler - Connexion et génération de JWT
-func loginHandler(authService *services.AuthService, logger *utils.Logger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			utils.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
-			return
-		}
-
-		var req models.LoginRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			utils.WriteError(w, http.StatusBadRequest, "Invalid JSON")
-			return
-		}
-
-		// Validation
-		if req.Email == "" || req.Password == "" {
-			utils.WriteError(w, http.StatusBadRequest, "Email and password are required")
-			return
-		}
-
-		response, err := authService.Login(&req)
-		if err != nil {
-			logger.Warn("Login failed for email: " + req.Email)
-			utils.WriteError(w, http.StatusUnauthorized, "Invalid credentials")
-			return
-		}
-
-		logger.Info("Successful login for user: " + response.User.Email)
-		utils.WriteSuccess(w, response, "Login successful")
-	}
-}
-
-// refreshTokenHandler - Rafraîchir un token JWT
-func refreshTokenHandler(authService *services.AuthService, logger *utils.Logger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			utils.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
-			return
-		}
-
-		var req models.RefreshTokenRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			utils.WriteError(w, http.StatusBadRequest, "Invalid JSON")
-			return
-		}
-
-		if req.Token == "" {
-			utils.WriteError(w, http.StatusBadRequest, "Token is required")
-			return
-		}
-
-		newToken, err := authService.RefreshToken(req.Token)
-		if err != nil {
-			logger.Warn("Token refresh failed: " + err.Error())
-			utils.WriteError(w, http.StatusUnauthorized, "Invalid or expired token")
-			return
-		}
-
-		utils.WriteSuccess(w, models.RefreshTokenResponse{
-			Token: newToken,
-		}, "Token refreshed successfully")
 	}
 }
 
@@ -177,52 +149,6 @@ func meHandler(logger *utils.Logger) http.HandlerFunc {
 
 		logger.Info("User info requested: " + user.Email)
 		utils.WriteSuccess(w, user, "User retrieved successfully")
-	}
-}
-
-// emailsHandler - Route protégée pour gérer les emails
-func emailsHandler(cfg *config.Config, logger *utils.Logger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Récupérer l'utilisateur depuis le contexte
-		user, ok := r.Context().Value(middleware.UserContextKey).(*models.User)
-		if !ok || user == nil {
-			utils.WriteError(w, http.StatusUnauthorized, "User not found")
-			return
-		}
-
-		logger.Info("Emails endpoint called by: " + user.Email)
-
-		// Exemple de réponse
-		utils.WriteSuccess(w, map[string]interface{}{
-			"message":  "Emails endpoint ready",
-			"user_id":  user.ID,
-			"username": user.Username,
-			"emails":   []string{"example@example.com"},
-		}, "Emails retrieved successfully")
-	}
-}
-
-// deleteHandler - Route protégée pour supprimer des emails
-func deleteHandler(cfg *config.Config, logger *utils.Logger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodDelete && r.Method != http.MethodPost {
-			utils.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
-			return
-		}
-
-		user, ok := r.Context().Value(middleware.UserContextKey).(*models.User)
-		if !ok || user == nil {
-			utils.WriteError(w, http.StatusUnauthorized, "User not found")
-			return
-		}
-
-		logger.Info("Delete endpoint called by: " + user.Email)
-
-		// Exemple de réponse
-		utils.WriteSuccess(w, map[string]interface{}{
-			"message": "Delete endpoint ready",
-			"user_id": user.ID,
-		}, "Ready to delete emails")
 	}
 }
 

@@ -58,3 +58,6 @@ func RespondJSON(w http.ResponseWriter, status int, payload interface{}) {
 	w.WriteHeader(status)
 	w.Write(response)
 }
+func DecodeJSON(r *http.Request, v interface{}) error {
+	return json.NewDecoder(r.Body).Decode(v)
+}
