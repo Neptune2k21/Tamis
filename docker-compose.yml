@@ -44,7 +44,7 @@ services:
     build:
       context: ./server
       dockerfile: Dockerfile
-      target: development
+      target: ${TARGET_ENV}
     container_name: tamis-server
     restart: unless-stopped
     ports:
@@ -53,14 +53,19 @@ services:
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=tamis
-      - DB_PASSWORD=tamis_dev_password
+      - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=tamis_db
       - DB_SSL_MODE=disable
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - GO_ENV=development
+      - GO_ENV=${GO_ENV}
       - PORT=8080
-      - JWT_SECRET=Tamis-Mamadou-super-secret-key
+      - JWT_SECRET=${JWT_SECRET}
+      - GMAIL_CLIENT_ID=${GMAIL_CLIENT_ID}
+      - GMAIL_CLIENT_SECRET=${GMAIL_CLIENT_SECRET}
+      - GMAIL_REDIRECT_URL=${GMAIL_REDIRECT_URL}
+      - FRONTEND_URL=${FRONTEND_URL}
+
     volumes:
       - ./server:/app
       - /app/tmp
@@ -78,7 +83,7 @@ services:
     build:
       context: ./client
       dockerfile: Dockerfile
-      target: development
+      target: ${TARGET_ENV}
     container_name: tamis-client
     restart: unless-stopped
     ports:

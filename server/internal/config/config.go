@@ -38,7 +38,7 @@ type JWTConfig struct {
 }
 
 type EncryptionConfig struct {
-	Key string // Clé AES-256 pour chiffrer les tokens OAuth2
+	Key string
 }
 
 type OAuth2Config struct {
@@ -91,7 +91,7 @@ func Load() *Config {
 			}{
 				ClientID:     getEnv("GMAIL_CLIENT_ID", ""),
 				ClientSecret: getEnv("GMAIL_CLIENT_SECRET", ""),
-				RedirectURL:  getEnv("GMAIL_REDIRECT_URL", "http://localhost:8080/auth/gmail/callback"),
+				RedirectURL:  getEnv("GMAIL_REDIRECT_URL", "http://localhost:8080/api/oauth/google/callback"),
 			},
 			Outlook: struct {
 				ClientID     string

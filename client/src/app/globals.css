@@ -1,0 +1,68 @@
+/* Import Tailwind v4 modern */
+@import "tailwindcss";
+
+/* Définition des couleurs via CSS variables */
+@theme {
+  --color-background: #f5f5f5;
+  --color-light: #e0e0e0;
+  --color-accent: #ff5722;
+  --color-primary: #1d4ed8;
+  --color-secondary: #2563eb;
+  --color-neutral: #d1d5db; /* gris neutre pour bordures / inputs */
+  --color-white: #ffffff;
+  --color-red: #ef4444;
+  --color-red-dark: #dc2626;
+}
+
+/* Styles globaux */
+@layer base {
+  body {
+    @apply bg-gradient-to-br from-background via-light to-accent;
+    @apply min-h-screen;
+  }
+}
+
+/* Composants personnalisés */
+@layer components {
+  .btn-primary {
+    @apply bg-primary hover:bg-secondary text-white font-semibold py-3 px-6 rounded-lg
+           transition-all duration-200 transform hover:scale-105 hover:shadow-lg;
+  }
+
+  .btn-secondary {
+    @apply bg-white hover:bg-gray-50 text-primary border-2 border-primary font-semibold py-3 px-6 rounded-lg
+           transition-all duration-200 transform hover:scale-105 hover:shadow-lg;
+  }
+
+  .btn-google {
+    @apply bg-red hover:bg-red-dark text-white font-semibold py-3 px-6 rounded-lg
+           transition-all duration-200 transform hover:scale-105 hover:shadow-lg
+           flex items-center justify-center space-x-2;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary
+           focus:border-primary transition-all duration-200 bg-white;
+    border-color: var(--color-neutral);
+  }
+
+  .card {
+    @apply bg-white rounded-xl shadow-lg p-8 backdrop-blur-sm;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .page-container {
+    @apply min-h-screen flex items-center justify-center p-4;
+  }
+
+  .form-container {
+    @apply max-w-md w-full space-y-6;
+  }
+}
+
+/* Utilitaires personnalisés */
+@layer utilities {
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent;
+  }
+}

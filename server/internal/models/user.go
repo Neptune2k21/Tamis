@@ -4,11 +4,12 @@ import "time"
 
 // User représente un utilisateur dans la base de données
 type User struct {
-	ID        int       `json:"id"`
-	Email     string    `json:"email"`
-	Username  string    `json:"username"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID           int       `json:"id"`
+	Email        string    `json:"email"`
+	Username     string    `json:"username"`
+	AuthProvider string    `json:"auth_provider"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 // CreateUserRequest - Requête d'inscription
@@ -16,6 +17,13 @@ type CreateUserRequest struct {
 	Email    string `json:"email" validate:"required,email"`
 	Username string `json:"username" validate:"required,min=3,max=50"`
 	Password string `json:"password" validate:"required,min=8"`
+}
+
+// CreateOAuthUserRequest - Requête d'inscription OAuth
+type CreateOAuthUserRequest struct {
+	Email        string `json:"email" validate:"required,email"`
+	Username     string `json:"username" validate:"required,min=3,max=50"`
+	AuthProvider string `json:"auth_provider" validate:"required"`
 }
 
 // LoginRequest - Requête de connexion

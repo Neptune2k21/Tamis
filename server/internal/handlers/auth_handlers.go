@@ -1,4 +1,4 @@
-package api
+package handlers
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ import (
 )
 
 // registerHandler - Inscription d'un nouvel utilisateur
-func registerHandler(authService *services.AuthService, logger *utils.Logger) http.HandlerFunc {
+func RegisterHandler(authService *services.AuthService, logger *utils.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			utils.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -47,8 +47,8 @@ func registerHandler(authService *services.AuthService, logger *utils.Logger) ht
 	}
 }
 
-// loginHandler - Connexion et génération de JWT
-func loginHandler(authService *services.AuthService, logger *utils.Logger) http.HandlerFunc {
+// LoginHandler - Connexion et génération de JWT
+func LoginHandler(authService *services.AuthService, logger *utils.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			utils.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -79,8 +79,8 @@ func loginHandler(authService *services.AuthService, logger *utils.Logger) http.
 	}
 }
 
-// refreshTokenHandler - Rafraîchir un token JWT
-func refreshTokenHandler(authService *services.AuthService, logger *utils.Logger) http.HandlerFunc {
+// RefreshTokenHandler - Rafraîchir un token JWT
+func RefreshTokenHandler(authService *services.AuthService, logger *utils.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			utils.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
