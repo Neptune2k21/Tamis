@@ -5,7 +5,6 @@ import (
 	"tamis-server/internal/config"
 	"tamis-server/internal/handlers"
 	"tamis-server/internal/middleware"
-	"tamis-server/internal/models"
 	"tamis-server/internal/services"
 	"tamis-server/internal/utils"
 )
@@ -19,10 +18,10 @@ func RegisterRoutes(
 	authMiddleware *middleware.AuthMiddleware,
 	accountService *services.AccountService,
 	mailService *services.MailService,
-	oauth2Service *utils.OAuth2Service,
+	oauth2Service *services.OAuth2Service,
 ) {
 	// Routes d'authentification (publiques)
-	registerAuthRoutes(mux, authService, logger)
+	registerAuthRoutes(mux, authMiddleware, authService, logger, oauth2Service)
 
 	// Routes d'API générales
 	registerAPIRoutes(mux, cfg, logger, authMiddleware)
@@ -37,48 +36,48 @@ func RegisterRoutes(
 	registerMailRoutes(mux, authMiddleware, mailService, logger)
 }
 
-// registerAuthRoutes - Routes d'authentification
-func registerAuthRoutes(mux *http.ServeMux, authService *services.AuthService, logger *utils.Logger) {
-	mux.HandleFunc("/api/auth/register", corsMiddleware(registerHandler(authService, logger)))
-	mux.HandleFunc("/api/auth/login", corsMiddleware(loginHandler(authService, logger)))
-	mux.HandleFunc("/api/auth/refresh", corsMiddleware(refreshTokenHandler(authService, logger)))
+// registerAuthRoutes - Routes d'authentification publiques
+func registerAuthRoutes(mux *http.ServeMux, authMiddleware *middleware.AuthMiddleware, authService *services.AuthService, logger *utils.Logger, oauth2Service *services.OAuth2Service) {
+	mux.Handle("/api/auth/register", authMiddleware.CORS(http.HandlerFunc(handlers.RegisterHandler(authService, logger))))
+	mux.Handle("/api/auth/login", authMiddleware.CORS(http.HandlerFunc(handlers.LoginHandler(authService, logger))))
+	mux.Handle("/api/auth/refresh", authMiddleware.CORS(http.HandlerFunc(handlers.RefreshTokenHandler(authService, logger))))
+	mux.Handle("/api/auth/google", authMiddleware.CORS(http.HandlerFunc(handlers.PublicGoogleOAuthHandler(oauth2Service, logger))))
+	mux.Handle("/api/auth/google/callback", authMiddleware.CORS(http.HandlerFunc(handlers.PublicGoogleOAuthCallbackHandler(oauth2Service, authService, logger))))
+	mux.Handle("/api/auth/google/callback-process", authMiddleware.CORS(http.HandlerFunc(handlers.ProcessOAuthCallbackHandler(authService, logger))))
 }
 
 // registerAPIRoutes - Routes de l'API (protégées et publiques)
 func registerAPIRoutes(mux *http.ServeMux, cfg *config.Config, logger *utils.Logger, authMiddleware *middleware.AuthMiddleware) {
 	// Route de santé (publique)
-	mux.HandleFunc("/api/health", corsMiddleware(healthHandler(cfg, logger)))
+	mux.Handle("/api/health", authMiddleware.CORS(http.HandlerFunc(HealthHandler(cfg, logger))))
 
-	// Routes protégées
+	// Route utilisateur (protégée)
 	mux.Handle("/api/user/me",
 		authMiddleware.CORS(
-			authMiddleware.RequireAuth(http.HandlerFunc(meHandler(logger))),
+			authMiddleware.RequireAuth(http.HandlerFunc(handlers.MeHandler(logger))),
 		))
 }
 
 // registerAccountRoutes - Routes de gestion des comptes email
 func registerAccountRoutes(mux *http.ServeMux, authMiddleware *middleware.AuthMiddleware, accountService *services.AccountService, logger *utils.Logger) {
-	// Ajouter un compte email
 	mux.Handle("/api/accounts/add",
 		authMiddleware.CORS(
-			authMiddleware.RequireAuth(http.HandlerFunc(AddAccountHandler(accountService, logger))),
+			authMiddleware.RequireAuth(http.HandlerFunc(handlers.AddAccountHandler(accountService, logger))),
 		))
 
-	// Lister les comptes email
 	mux.Handle("/api/accounts",
 		authMiddleware.CORS(
-			authMiddleware.RequireAuth(http.HandlerFunc(ListAccountsHandler(accountService, logger))),
+			authMiddleware.RequireAuth(http.HandlerFunc(handlers.ListAccountsHandler(accountService, logger))),
 		))
 
-	// Supprimer un compte email
 	mux.Handle("/api/accounts/remove",
 		authMiddleware.CORS(
-			authMiddleware.RequireAuth(http.HandlerFunc(DeleteAccountHandler(accountService, logger))),
+			authMiddleware.RequireAuth(http.HandlerFunc(handlers.DeleteAccountHandler(accountService, logger))),
 		))
 }
 
 // registerOAuthRoutes - Routes OAuth2
-func registerOAuthRoutes(mux *http.ServeMux, authMiddleware *middleware.AuthMiddleware, oauth2Service *utils.OAuth2Service, accountService *services.AccountService, logger *utils.Logger) {
+func registerOAuthRoutes(mux *http.ServeMux, authMiddleware *middleware.AuthMiddleware, oauth2Service *services.OAuth2Service, accountService *services.AccountService, logger *utils.Logger) {
 	// Initier OAuth Google
 	mux.Handle("/api/oauth/google/initiate",
 		authMiddleware.CORS(
@@ -86,7 +85,7 @@ func registerOAuthRoutes(mux *http.ServeMux, authMiddleware *middleware.AuthMidd
 		))
 
 	// Callback OAuth Google (public)
-	mux.HandleFunc("/api/oauth/google/callback", corsMiddleware(handlers.GoogleOAuthCallbackHandler(oauth2Service, accountService, logger)))
+	mux.Handle("/api/oauth/google/callback", authMiddleware.CORS(http.HandlerFunc(handlers.GoogleOAuthCallbackHandler(oauth2Service, accountService, logger))))
 
 	// Finaliser l'ajout du compte
 	mux.Handle("/api/oauth/complete",
@@ -97,63 +96,24 @@ func registerOAuthRoutes(mux *http.ServeMux, authMiddleware *middleware.AuthMidd
 
 // registerMailRoutes - Routes de gestion des emails
 func registerMailRoutes(mux *http.ServeMux, authMiddleware *middleware.AuthMiddleware, mailService *services.MailService, logger *utils.Logger) {
-	// Lister tous les emails consolidés
 	mux.Handle("/api/mails",
 		authMiddleware.CORS(
-			authMiddleware.RequireAuth(http.HandlerFunc(ListMailsHandler(mailService, logger))),
+			authMiddleware.RequireAuth(http.HandlerFunc(handlers.ListMailsHandler(mailService, logger))),
 		))
 
-	// Actions sur les emails (supprimer, archiver, marquer lu)
 	mux.Handle("/api/mails/action",
 		authMiddleware.CORS(
-			authMiddleware.RequireAuth(http.HandlerFunc(MailActionHandler(mailService, logger))),
+			authMiddleware.RequireAuth(http.HandlerFunc(handlers.MailActionHandler(mailService, logger))),
 		))
 
-	// Synchroniser les emails
 	mux.Handle("/api/mails/sync",
 		authMiddleware.CORS(
-			authMiddleware.RequireAuth(http.HandlerFunc(SyncMailsHandler(mailService, logger))),
+			authMiddleware.RequireAuth(http.HandlerFunc(handlers.SyncMailsHandler(mailService, logger))),
 		))
 }
 
-// corsMiddleware - CORS pour les routes publiques
-func corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-
-		next(w, r)
-	}
-}
-
-// meHandler - Récupérer les informations de l'utilisateur connecté
-func meHandler(logger *utils.Logger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			utils.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
-			return
-		}
-
-		// Récupérer l'utilisateur depuis le contexte (injecté par le middleware)
-		user, ok := r.Context().Value(middleware.UserContextKey).(*models.User)
-		if !ok || user == nil {
-			utils.WriteError(w, http.StatusUnauthorized, "User not found in context")
-			return
-		}
-
-		logger.Info("User info requested: " + user.Email)
-		utils.WriteSuccess(w, user, "User retrieved successfully")
-	}
-}
-
-// healthHandler - Vérifier l'état du service
-func healthHandler(cfg *config.Config, logger *utils.Logger) http.HandlerFunc {
+// HealthHandler - Vérifier l'état du service
+func HealthHandler(cfg *config.Config, logger *utils.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			utils.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")

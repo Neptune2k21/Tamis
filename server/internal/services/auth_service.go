@@ -2,6 +2,8 @@ package services
 
 import (
 	"fmt"
+	"regexp"
+	"strings"
 	"tamis-server/internal/models"
 	"tamis-server/internal/repository"
 	"tamis-server/internal/utils"
@@ -49,7 +51,7 @@ func (s *AuthService) Register(req *models.CreateUserRequest) (*models.User, err
 		return nil, fmt.Errorf("user already exists")
 	}
 
-	// ✅ Hasher le VRAI mot de passe de l'utilisateur
+	// Hasher le VRAI mot de passe de l'utilisateur
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		s.logger.Error(fmt.Sprintf("Failed to hash password: %v", err))
@@ -100,7 +102,7 @@ func (s *AuthService) Login(req *models.LoginRequest) (*models.LoginResponse, er
 		return nil, fmt.Errorf("invalid credentials")
 	}
 
-	// ✅ Générer un JWT sécurisé
+	// Générer un JWT sécurisé
 	token, err := s.GenerateJWT(user)
 	if err != nil {
 		s.logger.Error(fmt.Sprintf("Failed to generate JWT for user %s: %v", user.Email, err))
@@ -192,4 +194,119 @@ func (s *AuthService) RefreshToken(oldToken string) (string, error) {
 
 	s.logger.Info(fmt.Sprintf("Token refreshed for user: %s", user.Email))
 	return newToken, nil
+}
+
+// LoginWithOAuth - Connexion ou inscription via OAuth
+func (s *AuthService) LoginWithOAuth(email, name, provider string) (*models.LoginResponse, error) {
+	// Vérifier si l'utilisateur existe déjà
+	user, err := s.userRepo.GetByEmail(email)
+
+	if err != nil {
+		// L'utilisateur n'existe pas, on le crée
+		return s.registerWithOAuth(email, name, provider)
+	}
+
+	// L'utilisateur existe
+	if user.AuthProvider != provider && user.AuthProvider != "local" {
+		return nil, fmt.Errorf("email already associated with %s account", user.AuthProvider)
+	}
+
+	// Si c'est un compte local et qu'il essaie de se connecter via OAuth
+	if user.AuthProvider == "local" {
+		// On peut soit refuser, soit permettre la liaison de compte
+		// on refuse pour l'instant
+		return nil, fmt.Errorf("email already associated with a local account. Please login with email/password")
+	}
+
+	// Générer un JWT
+	token, err := s.GenerateJWT(user)
+	if err != nil {
+		s.logger.Error(fmt.Sprintf("Failed to generate JWT for OAuth user %s: %v", user.Email, err))
+		return nil, fmt.Errorf("failed to generate token")
+	}
+
+	s.logger.Info(fmt.Sprintf("OAuth user logged in: %s (ID: %d, Provider: %s)", user.Email, user.ID, provider))
+
+	return &models.LoginResponse{
+		User:  *user,
+		Token: token,
+	}, nil
+}
+
+// registerWithOAuth - Inscription via OAuth
+func (s *AuthService) registerWithOAuth(email, name, provider string) (*models.LoginResponse, error) {
+	// Générer un username unique basé sur l'email et le nom
+	username := s.generateUniqueUsername(email, name)
+
+	// Créer l'utilisateur OAuth
+	user := &models.User{
+		Email:    email,
+		Username: username,
+	}
+
+	createdUser, err := s.userRepo.CreateOAuthUser(user, provider)
+	if err != nil {
+		s.logger.Error(fmt.Sprintf("Failed to create OAuth user: %v", err))
+		return nil, fmt.Errorf("failed to create user")
+	}
+
+	// Générer un JWT
+	token, err := s.GenerateJWT(createdUser)
+	if err != nil {
+		s.logger.Error(fmt.Sprintf("Failed to generate JWT for new OAuth user %s: %v", createdUser.Email, err))
+		return nil, fmt.Errorf("failed to generate token")
+	}
+
+	s.logger.Info(fmt.Sprintf("OAuth user registered: %s (ID: %d, Provider: %s)", createdUser.Email, createdUser.ID, provider))
+
+	return &models.LoginResponse{
+		User:  *createdUser,
+		Token: token,
+	}, nil
+}
+
+// generateUniqueUsername - Générer un nom d'utilisateur unique
+func (s *AuthService) generateUniqueUsername(email, name string) string {
+
+	baseUsername := name
+	if baseUsername == "" {
+		emailParts := strings.Split(email, "@")
+		if len(emailParts) > 0 {
+			baseUsername = emailParts[0]
+		} else {
+			baseUsername = "user"
+		}
+	}
+
+	// Nettoyer le nom
+	baseUsername = strings.ToLower(strings.ReplaceAll(baseUsername, " ", ""))
+	baseUsername = regexp.MustCompile(`[^a-z0-9]`).ReplaceAllString(baseUsername, "")
+
+	// S'assurer qu'il y a au moins 3 caractères
+	if len(baseUsername) < 3 {
+		baseUsername = "user" + baseUsername
+	}
+
+	// Vérifier l'unicité et ajouter un suffixe si nécessaire
+	username := baseUsername
+	counter := 1
+
+	for {
+
+		existingUser, _ := s.userRepo.GetByUsername(username)
+		if existingUser == nil {
+			break
+		}
+
+		username = fmt.Sprintf("%s%d", baseUsername, counter)
+		counter++
+
+		// Éviter une boucle infinie
+		if counter > 9999 {
+			username = fmt.Sprintf("%s%d", baseUsername, time.Now().Unix())
+			break
+		}
+	}
+
+	return username
 }

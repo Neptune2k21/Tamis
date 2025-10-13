@@ -16,7 +16,7 @@ import (
 type AccountService struct {
 	accountRepo   *repository.AccountRepository
 	logger        *utils.Logger
-	encryptionKey []byte // Clé de chiffrement pour les tokens
+	encryptionKey []byte
 }
 
 func NewAccountService(accountRepo *repository.AccountRepository, logger *utils.Logger, encryptionKey string) *AccountService {

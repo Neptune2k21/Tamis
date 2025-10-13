@@ -1,4 +1,4 @@
-package utils
+package services
 
 import (
 	"encoding/json"
@@ -8,15 +8,16 @@ import (
 	"net/url"
 	"tamis-server/internal/config"
 	"tamis-server/internal/models"
+	"tamis-server/internal/utils"
 	"time"
 )
 
 type OAuth2Service struct {
 	config *config.Config
-	logger *Logger
+	logger *utils.Logger
 }
 
-func NewOAuth2Service(config *config.Config, logger *Logger) *OAuth2Service {
+func NewOAuth2Service(config *config.Config, logger *utils.Logger) *OAuth2Service {
 	return &OAuth2Service{
 		config: config,
 		logger: logger,
@@ -147,11 +148,17 @@ func (s *OAuth2Service) GetUserInfo(accessToken string) (*GoogleUserInfo, error)
 		return nil, fmt.Errorf("failed to decode user info: %w", err)
 	}
 
+	s.logger.Info(fmt.Sprintf("Google user info: ID=%s, Email=%s, Name='%s', GivenName='%s', FamilyName='%s'",
+		userInfo.ID, userInfo.Email, userInfo.Name, userInfo.GivenName, userInfo.FamilyName))
+
 	return &userInfo, nil
 }
 
 type GoogleUserInfo struct {
-	ID    string `json:"id"`
-	Email string `json:"email"`
-	Name  string `json:"name"`
+	ID         string `json:"id"`
+	Email      string `json:"email"`
+	Name       string `json:"name"`
+	GivenName  string `json:"given_name"`
+	FamilyName string `json:"family_name"`
+	Picture    string `json:"picture"`
 }

@@ -52,7 +52,7 @@ func main() {
 	authService := services.NewAuthService(userRepo, logger, cfg.JWT.Secret)
 	accountService := services.NewAccountService(accountRepo, logger, cfg.Encryption.Key)
 	mailService := services.NewMailService(emailRepo, accountService, logger)
-	oauth2Service := utils.NewOAuth2Service(cfg, logger)
+	oauth2Service := services.NewOAuth2Service(cfg, logger)
 
 	// Initialiser les middlewares
 	authMiddleware := middleware.NewAuthMiddleware(userRepo, authService, logger)
@@ -71,7 +71,7 @@ func main() {
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		fmt.Fprintf(w, "<h1>Bienvenue sur Tamis API 🧹🚀</h1><p>Le serveur tourne sur le port %s</p><ul><li>Auth: /api/auth/</li><li>Accounts: /api/accounts/</li><li>Mails: /api/mails/</li></ul>", cfg.Server.Port)
+		fmt.Fprintf(w, "<h1>Bienvenue sur Tamis API 🧹🚀</h1><p>Le serveur tourne sur le port %s</p><ul><li>Auth: /api/auth/</li><li>Accounts: /api/accounts/</li><li>Mails: /api/mails/</li> <li>OAuth: /api/oauth/</li> </ul>", cfg.Server.Port)
 	})
 
 	err = http.ListenAndServe(addr, mux)

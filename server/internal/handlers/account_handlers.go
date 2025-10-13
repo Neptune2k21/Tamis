@@ -10,8 +10,8 @@ import (
 	"tamis-server/internal/utils"
 )
 
-// addAccountHandler - Ajouter un compte email via OAuth2
-func addAccountHandler(accountService *services.AccountService, logger *utils.Logger) http.HandlerFunc {
+// AddAccountHandler - Ajouter un compte email via OAuth2
+func AddAccountHandler(accountService *services.AccountService, logger *utils.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			utils.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -38,7 +38,7 @@ func addAccountHandler(accountService *services.AccountService, logger *utils.Lo
 		}
 
 		// Vérifier que le provider est supporté
-		if !isValidProvider(req.Provider) {
+		if !IsValidProvider(req.Provider) {
 			utils.WriteError(w, http.StatusBadRequest, "Unsupported email provider")
 			return
 		}
@@ -56,8 +56,8 @@ func addAccountHandler(accountService *services.AccountService, logger *utils.Lo
 	}
 }
 
-// listAccountsHandler - Lister tous les comptes email de l'utilisateur
-func listAccountsHandler(accountService *services.AccountService, logger *utils.Logger) http.HandlerFunc {
+// ListAccountsHandler - Lister tous les comptes email de l'utilisateur
+func ListAccountsHandler(accountService *services.AccountService, logger *utils.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			utils.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -85,8 +85,8 @@ func listAccountsHandler(accountService *services.AccountService, logger *utils.
 	}
 }
 
-// deleteAccountHandler - Supprimer un compte email (déconnexion OAuth2)
-func deleteAccountHandler(accountService *services.AccountService, logger *utils.Logger) http.HandlerFunc {
+// DeleteAccountHandler - Supprimer un compte email (déconnexion OAuth2)
+func DeleteAccountHandler(accountService *services.AccountService, logger *utils.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodDelete {
 			utils.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -124,8 +124,8 @@ func deleteAccountHandler(accountService *services.AccountService, logger *utils
 	}
 }
 
-// isValidProvider - Vérifier si le provider est supporté
-func isValidProvider(provider models.EmailProvider) bool {
+// IsValidProvider - Vérifier si le provider est supporté
+func IsValidProvider(provider models.EmailProvider) bool {
 	validProviders := []models.EmailProvider{
 		models.ProviderGmail,
 		models.ProviderYahoo,
@@ -139,4 +139,24 @@ func isValidProvider(provider models.EmailProvider) bool {
 		}
 	}
 	return false
+}
+
+// MeHandler - Récupérer les informations de l'utilisateur connecté
+func MeHandler(logger *utils.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			utils.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
+			return
+		}
+
+		// Récupérer l'utilisateur depuis le contexte (injecté par le middleware)
+		user, ok := r.Context().Value(middleware.UserContextKey).(*models.User)
+		if !ok || user == nil {
+			utils.WriteError(w, http.StatusUnauthorized, "User not found in context")
+			return
+		}
+
+		logger.Info("User info requested: " + user.Email)
+		utils.WriteSuccess(w, user, "User retrieved successfully")
+	}
 }

@@ -25,7 +25,7 @@ func ListMailsHandler(mailService *services.MailService, logger *utils.Logger) h
 		}
 
 		// Construire les filtres depuis les paramètres de requête
-		filter := buildEmailFilter(r)
+		filter := BuildEmailFilter(r)
 
 		emails, totalCount, err := mailService.GetUserEmails(user.ID, filter)
 		if err != nil {
@@ -117,8 +117,8 @@ func SyncMailsHandler(mailService *services.MailService, logger *utils.Logger) h
 	}
 }
 
-// buildEmailFilter - Construire le filtre depuis les paramètres de requête
-func buildEmailFilter(r *http.Request) *models.EmailFilter {
+// BuildEmailFilter - Construire le filtre depuis les paramètres de requête
+func BuildEmailFilter(r *http.Request) *models.EmailFilter {
 	filter := &models.EmailFilter{}
 
 	// Provider
